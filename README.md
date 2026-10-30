@@ -1,1 +1,1 @@
-# tiendacyc.github.io
+# CYC

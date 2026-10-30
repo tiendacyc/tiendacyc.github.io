@@ -1,0 +1,41 @@
+name: traer-productos
+
+# Trae la lista de productos que arma el robot de CYC cada noche (y cuando se corre a mano) y la deja en esta web.
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: traer
+  cancel-in-progress: false
+
+jobs:
+  traer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bajar la lista
+        run: |
+          curl -fsS --retry 3 -m 60 "https://maticaldas-del.github.io/web-cyc/tienda/productos.json?t=$(date +%s)" -o nuevo.json
+          python3 - <<'PY'
+          import json, os, sys
+          n = json.load(open('nuevo.json'))
+          if not isinstance(n.get('productos'), list) or len(n['productos']) < 50:
+              sys.exit('la lista nueva vino vacía o rota: no la cambio')
+          v = json.load(open('productos.json')) if os.path.exists('productos.json') else {'productos': []}
+          if len(n['productos']) < 0.75 * len(v.get('productos', [])):
+              sys.exit('la lista nueva tiene menos del 75% de la de ahora: no la cambio')
+          PY
+          mv nuevo.json productos.json
+      - name: Guardar si cambió
+        run: |
+          git config user.name "cyc"
+          git config user.email "cyc@users.noreply.github.com"
+          git add productos.json
+          if git diff --cached --quiet; then echo "igual"; exit 0; fi
+          git commit -q -m "productos"
+          git push
