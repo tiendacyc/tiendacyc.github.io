@@ -31,11 +31,18 @@ jobs:
               sys.exit('la lista nueva tiene menos del 75% de la de ahora: no la cambio')
           PY
           mv nuevo.json productos.json
+      - name: Bajar los detalles
+        run: |
+          # 📋 los detalles de ML de cada producto (31/10/2026): 64 archivos; uno que no baje o venga roto queda como estaba.
+          mkdir -p detalles
+          for i in $(seq 0 63); do
+            if curl -fsS --retry 3 -m 60 "https://maticaldas-del.github.io/web-cyc/tienda/detalles/d$i.json?t=$(date +%s)" -o "nuevo_d.json" && python3 -c "import json;json.load(open('nuevo_d.json'))"; then mv nuevo_d.json "detalles/d$i.json"; else rm -f nuevo_d.json; echo "d$i no bajó"; fi
+          done
       - name: Guardar si cambió
         run: |
           git config user.name "cyc"
           git config user.email "cyc@users.noreply.github.com"
-          git add productos.json
+          git add productos.json detalles
           if git diff --cached --quiet; then echo "igual"; exit 0; fi
           git commit -q -m "productos"
           git push
